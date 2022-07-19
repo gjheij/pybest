@@ -1,5 +1,6 @@
 import os
 import click
+import datetime
 import subprocess
 import os.path as op
 import numpy as np
@@ -667,3 +668,28 @@ def pybest_vol2surf(in_file, out_dir, target, subjects_dir, smooth_fwhm=None):
         f_out = op.join(out_dir, f_out.replace('.nii.gz', '.gii'))
         to_run = cmd + f' --o {f_out} --hemi {hemi}'
         subprocess.call(to_run, shell=True, stdout=subprocess.DEVNULL)
+
+def fmriprep_version_from_func(func, log_dir=None):
+
+    # get modification time
+    m_time = os.path.getmtime(func)
+
+    # convert to string
+    time_stamp = datetime.datetime.fromtimestamp(m_time).strftime('%Y%m%d')
+
+    # cross-reference with directories in /log
+    logs = os.listdir(log_dir)
+    matched_logs = [op.join(log_dir, ii) for ii in logs if time_stamp in ii]
+
+    if len(matched_logs) == 0:
+        return "21.0.0"
+    else:
+        matched_log = matched_logs[0]
+        cfg = op.join(matched_log, 'fmriprep.toml')
+        
+        try:
+            import toml
+            cfg_data = toml.load(cfg)
+            return cfg_data['environment']['version']
+        except:
+            raise ValueError(f"Could not extract version from {cfg}. Did you install 'toml'?")

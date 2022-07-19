@@ -1,6 +1,7 @@
 import os
 import os.path as op
 from glob import glob
+from .utils import fmriprep_version_from_func
 
 
 def check_parameters(cfg, logger):
@@ -249,6 +250,7 @@ def find_data(cfg, logger):
         ffunc_dir = op.join(fprep_dir, f'sub-{sub}', 'func')
     else:
         ffunc_dir = op.join(fprep_dir, f'sub-{sub}', f'ses-{ses}', 'func')
+
     if cfg['iscifti'] == 'y':
         funcs = sorted(glob(op.join(ffunc_dir, f'*task-{task}_*space-{space}{idf}')))
     else:
@@ -259,10 +261,18 @@ def find_data(cfg, logger):
             f"sub-{sub}, ses-{ses}, task-{task}, space-{space}_{idf}"
         )
 
-    if cfg['iscifti'] == 'y':
-        confs = sorted(glob(op.join(ffunc_dir, f'*task-{task}_*desc-confounds_timeseries.tsv')))
+    # search based on regexp entertained by the fMRIPrep version used to preprocess the data
+    if isinstance(funcs, list):
+        version = fmriprep_version_from_func(funcs[0], log_dir=op.join(fprep_dir, f'sub-{sub}', 'log'))
+
+        if version.split('.')[0] < "20":
+            globber = "confounds_regressors"
+        else:
+            globber = "confounds_timeseries"
     else:
-        confs = sorted(glob(op.join(ffunc_dir, f'*task-{task}_*desc-confounds_regressors.tsv')))
+        globber = "confounds_timeseries"
+
+    confs = sorted(glob(op.join(ffunc_dir, f'*task-{task}_*desc-{globber}.tsv')))
 
     # Find event files, which should be in the BIDS dir
     bids_dir = cfg['bids_dir']
@@ -301,7 +311,7 @@ def find_data(cfg, logger):
     ricor_dir = cfg['ricor_dir']
     if ricor_dir is not None:
         ricors = sorted(glob(op.join(
-            ricor_dir, f'sub-{sub}', f'ses-{ses}', 'physio', f'*task-{task}_*regressors.tsv'
+            ricor_dir, f'sub-{sub}', f'ses-{ses}', 'physio', f'*task-{task}_*timeseries.tsv'
         )))
         logger.info(f"Found {len(ricors)} RETROICOR files for task {task}")
     else:
