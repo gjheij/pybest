@@ -28,7 +28,7 @@ def load_gifti(f, cfg, return_tr=True):
     """ Load gifti array. """
     f_gif = nib.load(f)
     data = np.vstack([arr.data for arr in f_gif.darrays])
-    start_tr = [item[1] if re.search(item[0], f, re.IGNORECASE) else 0 for item in cfg.get('skip_tr')][0]
+    start_tr = [item[1] if isinstance(item[0], str) else 0 for item in cfg.get('skip_tr')][0]
     tr = float(f_gif.darrays[0].get_metadata()['TimeStep'])
     if return_tr:
         return data[start_tr:,:], tr
@@ -339,7 +339,6 @@ def hp_filter(data, tr, ddict, cfg, standardize=True):
     n_vol = data.shape[0]
     st_ref = cfg['slice_time_ref']  # offset frametimes by st_ref * tr
     ft = np.linspace(st_ref * tr, (n_vol + st_ref) * tr, n_vol, endpoint=False)
-
     # Create high-pass filter and clean
     if cfg['high_pass_type'] == 'dct':
         hp_set = dct_set(cfg['high_pass'], ft)
@@ -668,28 +667,3 @@ def pybest_vol2surf(in_file, out_dir, target, subjects_dir, smooth_fwhm=None):
         f_out = op.join(out_dir, f_out.replace('.nii.gz', '.gii'))
         to_run = cmd + f' --o {f_out} --hemi {hemi}'
         subprocess.call(to_run, shell=True, stdout=subprocess.DEVNULL)
-
-def fmriprep_version_from_func(func, log_dir=None):
-
-    # get modification time
-    m_time = os.path.getmtime(func)
-
-    # convert to string
-    time_stamp = datetime.datetime.fromtimestamp(m_time).strftime('%Y%m%d')
-
-    # cross-reference with directories in /log
-    logs = os.listdir(log_dir)
-    matched_logs = [op.join(log_dir, ii) for ii in logs if time_stamp in ii]
-
-    if len(matched_logs) == 0:
-        return "21.0.0"
-    else:
-        matched_log = matched_logs[0]
-        cfg = op.join(matched_log, 'fmriprep.toml')
-        
-        try:
-            import toml
-            cfg_data = toml.load(cfg)
-            return cfg_data['environment']['version']
-        except:
-            raise ValueError(f"Could not extract version from {cfg}. Did you install 'toml'?")

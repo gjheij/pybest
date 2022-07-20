@@ -1,8 +1,7 @@
 import os
 import os.path as op
 from glob import glob
-from .utils import fmriprep_version_from_func
-
+import json
 
 def check_parameters(cfg, logger):
     """ Checks parameter settings and raises errors in case of
@@ -88,10 +87,21 @@ def find_exp_parameters(cfg, logger):
     """ Extracts experimental parameters. """
 
     hemi, space = cfg['hemi'], cfg['space']
+    with open(op.join(cfg['fprep_dir'], 'dataset_description.json')) as conf:
+        info = json.load(conf)
+    cfg['version'] = info['GeneratedBy'][0]['Version']
+
+    if int(cfg['version'].split('.')[0]) < 21:
+        cfg['space_idf'] = f'hemi-{hemi}*.func.gii'
+        cfg['hemi_idf'] = f'space-{space}'
+    else:
+        cfg['space_idf'] = f'space-{space}*.func.gii'
+        cfg['hemi_idf'] = f'hemi-{hemi}'
+
     if cfg['iscifti'] == 'y':
         space_idf = f'*.dtseries.nii' if 'fs' in space else 'desc-preproc_bold.nii.gz'
     else:
-        space_idf = f'hemi-{hemi}*.func.gii' if 'fs' in space else 'desc-preproc_bold.nii.gz'
+        space_idf = cfg['space_idf'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
 
     # Use all possible participants if not provided
     if cfg['subject'] is None:
@@ -122,6 +132,8 @@ def find_exp_parameters(cfg, logger):
             cfg['session'].append(these_ses)
     else:
         cfg['session'] = [[cfg['session']]] * len(cfg['subject'])
+
+    
     
     # Use all tasks if no explicit task is provided
     if cfg['task'] is None:
@@ -135,14 +147,14 @@ def find_exp_parameters(cfg, logger):
                             cfg['fprep_dir'],
                             f'sub-{this_sub}',
                             'func',
-                            f"*space-{cfg['space']}*{space_idf}"
+                            f"*{cfg['hemi_idf']}*{space_idf}"
                         ))
                     else:
                         tmp = glob(op.join(
                             cfg['fprep_dir'],
                             f'sub-{this_sub}',
                             'func',
-                            f"*space-{cfg['space']}*_{space_idf}"
+                            f"*{cfg['hemi_idf']}*_{space_idf}"
                         ))
                 else:
                     if cfg['iscifti'] == 'y':
@@ -151,7 +163,7 @@ def find_exp_parameters(cfg, logger):
                             f'sub-{this_sub}',
                             f'ses-{this_ses}',
                             'func',
-                            f"*space-{cfg['space']}*{space_idf}"
+                            f"*{cfg['hemi_idf']}*{space_idf}"
                         ))
 
                     else:
@@ -160,7 +172,7 @@ def find_exp_parameters(cfg, logger):
                             f'sub-{this_sub}',
                             f'ses-{this_ses}',
                             'func',
-                            f"*space-{cfg['space']}*_{space_idf}"
+                            f"*{cfg['hemi_idf']}*_{space_idf}"
                         ))
 
                 these_ses_task = list(set(
@@ -187,14 +199,14 @@ def find_exp_parameters(cfg, logger):
                             cfg['fprep_dir'],
                             f'sub-{this_sub}',
                             'func',
-                            f"*task-{cfg['task']}_*space-{cfg['space']}*{space_idf}"
+                            f"*task-{cfg['task']}_*{cfg['hemi_idf']}*{space_idf}"
                         ))
                     else:
                         tmp = glob(op.join(
                             cfg['fprep_dir'],
                             f'sub-{this_sub}',
                             'func',
-                            f"*task-{cfg['task']}_*_space-{cfg['space']}*_{space_idf}"
+                            f"*task-{cfg['task']}_*_{cfg['hemi_idf']}*_{space_idf}"
                         ))
                 else:
                     if cfg['iscifti'] == 'y':
@@ -203,7 +215,7 @@ def find_exp_parameters(cfg, logger):
                             f'sub-{this_sub}',
                             f'ses-{this_ses}',
                             'func',
-                            f"*task-{cfg['task']}_*space-{cfg['space']}*{space_idf}"
+                            f"*task-{cfg['task']}_*{cfg['hemi_idf']}*{space_idf}"
                         ))
                     else:
                         tmp = glob(op.join(
@@ -211,7 +223,7 @@ def find_exp_parameters(cfg, logger):
                             f'sub-{this_sub}',
                             f'ses-{this_ses}',
                             'func',
-                            f"*task-{cfg['task']}_*_space-{cfg['space']}*_{space_idf}"
+                            f"*task-{cfg['task']}_*_{cfg['hemi_idf']}*_{space_idf}"
                         ))
                 if tmp:
                     these_task.append([cfg['task']])
@@ -242,7 +254,7 @@ def find_data(cfg, logger):
     if cfg['iscifti'] == 'y':
         idf = f'*.dtseries.nii' if 'fs' in space else 'desc-preproc_bold.nii.gz'
     else:
-        idf = f'hemi-{hemi}*.func.gii' if 'fs' in space else 'desc-preproc_bold.nii.gz'
+        idf = cfg['space_idf'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
 
     # Gather funcs, confs, tasks
     fprep_dir = cfg['fprep_dir']
@@ -252,9 +264,10 @@ def find_data(cfg, logger):
         ffunc_dir = op.join(fprep_dir, f'sub-{sub}', f'ses-{ses}', 'func')
 
     if cfg['iscifti'] == 'y':
-        funcs = sorted(glob(op.join(ffunc_dir, f'*task-{task}_*space-{space}{idf}')))
+        funcs = sorted(glob(op.join(ffunc_dir, f"*task-{task}_*{cfg['hemi_idf']}{idf}")))
     else:
-        funcs = sorted(glob(op.join(ffunc_dir, f'*task-{task}_*space-{space}_{idf}')))
+        funcs = sorted(glob(op.join(ffunc_dir, f"*task-{task}_*{cfg['hemi_idf']}_{idf}")))
+        
     if not funcs:
         raise ValueError(
             "Could not find fMRI data with the following parameters:\n"
@@ -262,13 +275,8 @@ def find_data(cfg, logger):
         )
 
     # search based on regexp entertained by the fMRIPrep version used to preprocess the data
-    if isinstance(funcs, list):
-        version = fmriprep_version_from_func(funcs[0], log_dir=op.join(fprep_dir, f'sub-{sub}', 'log'))
-
-        if version.split('.')[0] < "20":
-            globber = "confounds_regressors"
-        else:
-            globber = "confounds_timeseries"
+    if int(cfg['version'].split('.')[0]) < 20:
+        globber = "confounds_regressors"
     else:
         globber = "confounds_timeseries"
 
