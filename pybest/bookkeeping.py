@@ -1,6 +1,7 @@
 import os
 import os.path as op
 from glob import glob
+from .utils import get_file_from_substring
 import json
 
 def check_parameters(cfg, logger):
@@ -87,21 +88,11 @@ def find_exp_parameters(cfg, logger):
     """ Extracts experimental parameters. """
 
     hemi, space = cfg['hemi'], cfg['space']
-    with open(op.join(cfg['fprep_dir'], 'dataset_description.json')) as conf:
-        info = json.load(conf)
-    cfg['version'] = info['GeneratedBy'][0]['Version']
-
-    if int(cfg['version'].split('.')[0]) < 21:
-        cfg['space_idf'] = f'hemi-{hemi}*.func.gii'
-        cfg['hemi_idf'] = f'space-{space}'
-    else:
-        cfg['space_idf'] = f'space-{space}*.func.gii'
-        cfg['hemi_idf'] = f'hemi-{hemi}'
-
+    idf = [f"space-{space}"]
     if cfg['iscifti'] == 'y':
-        space_idf = f'*.dtseries.nii' if 'fs' in space else 'desc-preproc_bold.nii.gz'
+        idf += ['.dtseries.nii'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
     else:
-        space_idf = cfg['space_idf'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
+        idf += [f"hemi-{hemi}", "func.gii"] if 'fs' in space else 'desc-preproc_bold.nii.gz'
 
     # Use all possible participants if not provided
     if cfg['subject'] is None:
@@ -110,8 +101,7 @@ def find_exp_parameters(cfg, logger):
             sorted(glob(op.join(cfg['fprep_dir'], 'sub-*')))
             if op.isdir(s)
         ]
-        logger.info(
-            f"Found {len(cfg['subject'])} participant(s) {cfg['subject']}")
+        logger.info(f"Found {len(cfg['subject'])} participant(s) {cfg['subject']}")
     else:
         # Use a list by default
         cfg['subject'] = [cfg['subject']]
@@ -132,8 +122,6 @@ def find_exp_parameters(cfg, logger):
             cfg['session'].append(these_ses)
     else:
         cfg['session'] = [[cfg['session']]] * len(cfg['subject'])
-
-    
     
     # Use all tasks if no explicit task is provided
     if cfg['task'] is None:
@@ -142,39 +130,11 @@ def find_exp_parameters(cfg, logger):
             these_task = []
             for this_ses in these_ses:
                 if this_ses is None:  # only single session!
-                    if cfg['iscifti'] == 'y':
-                        tmp = glob(op.join(
-                            cfg['fprep_dir'],
-                            f'sub-{this_sub}',
-                            'func',
-                            f"*{cfg['hemi_idf']}*{space_idf}"
-                        ))
-                    else:
-                        tmp = glob(op.join(
-                            cfg['fprep_dir'],
-                            f'sub-{this_sub}',
-                            'func',
-                            f"*{cfg['hemi_idf']}*_{space_idf}"
-                        ))
+                    this_ses_dir = op.join(cfg['fprep_dir'], f'sub-{this_sub}', 'func')
                 else:
-                    if cfg['iscifti'] == 'y':
-                        tmp = glob(op.join(
-                            cfg['fprep_dir'],
-                            f'sub-{this_sub}',
-                            f'ses-{this_ses}',
-                            'func',
-                            f"*{cfg['hemi_idf']}*{space_idf}"
-                        ))
+                    this_ses_dir = op.join(cfg['fprep_dir'], f'sub-{this_sub}', f'ses-{this_ses}', 'func')
 
-                    else:
-                        tmp = glob(op.join(
-                            cfg['fprep_dir'],
-                            f'sub-{this_sub}',
-                            f'ses-{this_ses}',
-                            'func',
-                            f"*{cfg['hemi_idf']}*_{space_idf}"
-                        ))
-
+                tmp = get_file_from_substring(idf, this_ses_dir)
                 these_ses_task = list(set(
                     [op.basename(f).split('task-')[1].split('_')[0]
                      for f in tmp]
@@ -184,47 +144,22 @@ def find_exp_parameters(cfg, logger):
 
                 to_add = "" if this_ses is None else f"and ses-{this_ses}"
                 msg = f"Found {len(these_ses_task)} task(s) for sub-{this_sub} {to_add} {these_ses_task}"
-
                 logger.info(msg)
 
             cfg['task'].append(these_task)
     else:
+        # add task-flag to search parameters
+        idf += ["task-"]
         all_ses_tasks = []
         for this_sub, these_ses in zip(cfg['subject'], cfg['session']):
             these_task = []
             for this_ses in these_ses:
-                if this_ses is None:
-                    if cfg['iscifti'] == 'y':
-                        tmp = glob(op.join(
-                            cfg['fprep_dir'],
-                            f'sub-{this_sub}',
-                            'func',
-                            f"*task-{cfg['task']}_*{cfg['hemi_idf']}*{space_idf}"
-                        ))
-                    else:
-                        tmp = glob(op.join(
-                            cfg['fprep_dir'],
-                            f'sub-{this_sub}',
-                            'func',
-                            f"*task-{cfg['task']}_*_{cfg['hemi_idf']}*_{space_idf}"
-                        ))
+                if this_ses is None:  # only single session!
+                    this_ses_dir = op.join(cfg['fprep_dir'], f'sub-{this_sub}', 'func')
                 else:
-                    if cfg['iscifti'] == 'y':
-                        tmp = glob(op.join(
-                            cfg['fprep_dir'],
-                            f'sub-{this_sub}',
-                            f'ses-{this_ses}',
-                            'func',
-                            f"*task-{cfg['task']}_*{cfg['hemi_idf']}*{space_idf}"
-                        ))
-                    else:
-                        tmp = glob(op.join(
-                            cfg['fprep_dir'],
-                            f'sub-{this_sub}',
-                            f'ses-{this_ses}',
-                            'func',
-                            f"*task-{cfg['task']}_*_{cfg['hemi_idf']}*_{space_idf}"
-                        ))
+                    this_ses_dir = op.join(cfg['fprep_dir'], f'sub-{this_sub}', f'ses-{this_ses}', 'func')
+
+                tmp = get_file_from_substring(idf, this_ses_dir)
                 if tmp:
                     these_task.append([cfg['task']])
                 else:
@@ -249,12 +184,13 @@ def find_data(cfg, logger):
     sub, ses, task, hemi, space = cfg['c_sub'], cfg['c_ses'], cfg['c_task'], cfg['hemi'], cfg['space']
     if cfg['pool_sessions']:
         ses = '*'  # wilcard for globbing across sessions
-
+    
+    idf = ["task-", f"space-{space}"]
     # idf = identifier for files
     if cfg['iscifti'] == 'y':
-        idf = f'*.dtseries.nii' if 'fs' in space else 'desc-preproc_bold.nii.gz'
+        idf += ['.dtseries.nii'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
     else:
-        idf = cfg['space_idf'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
+        idf += [f'hemi-{hemi}', '.func.gii'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
 
     # Gather funcs, confs, tasks
     fprep_dir = cfg['fprep_dir']
@@ -263,24 +199,10 @@ def find_data(cfg, logger):
     else:
         ffunc_dir = op.join(fprep_dir, f'sub-{sub}', f'ses-{ses}', 'func')
 
-    if cfg['iscifti'] == 'y':
-        funcs = sorted(glob(op.join(ffunc_dir, f"*task-{task}_*{cfg['hemi_idf']}{idf}")))
-    else:
-        funcs = sorted(glob(op.join(ffunc_dir, f"*task-{task}_*{cfg['hemi_idf']}_{idf}")))
-        
-    if not funcs:
-        raise ValueError(
-            "Could not find fMRI data with the following parameters:\n"
-            f"sub-{sub}, ses-{ses}, task-{task}, space-{space}_{idf}"
-        )
+    funcs = get_file_from_substring(idf, ffunc_dir)
 
     # search based on regexp entertained by the fMRIPrep version used to preprocess the data
-    if int(cfg['version'].split('.')[0]) < 20:
-        globber = "confounds_regressors"
-    else:
-        globber = "confounds_timeseries"
-
-    confs = sorted(glob(op.join(ffunc_dir, f'*task-{task}_*desc-{globber}.tsv')))
+    confs = get_file_from_substring([f'task-{task}', 'confounds', 'tsv'], ffunc_dir)
 
     # Find event files, which should be in the BIDS dir
     bids_dir = cfg['bids_dir']
@@ -293,9 +215,7 @@ def find_data(cfg, logger):
         events = sorted(glob(op.join(bfunc_dir, f'*task-{task}_*events.tsv')))
 
         if len(events) == 0:
-            logger.warning(
-                "Did not find event files! Going to assume there's no task involved."
-            )
+            logger.warning("Did not find event files! Going to assume there's no task involved.")
             events = None
             to_check = [confs]
         else:

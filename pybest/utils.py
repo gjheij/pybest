@@ -667,3 +667,98 @@ def pybest_vol2surf(in_file, out_dir, target, subjects_dir, smooth_fwhm=None):
         f_out = op.join(out_dir, f_out.replace('.nii.gz', '.gii'))
         to_run = cmd + f' --o {f_out} --hemi {hemi}'
         subprocess.call(to_run, shell=True, stdout=subprocess.DEVNULL)
+
+def get_file_from_substring(filt, path, return_msg='error', exclude=None):
+    """get_file_from_substring
+    This function returns the file given a path and a substring. Avoids annoying stuff with glob. Now also allows multiple filters to be applied to the list of files in the directory. The idea here is to construct a binary matrix of shape (files_in_directory, nr_of_filters), and test for each filter if it exists in the filename. If all filters are present in a file, then the entire row should be 1. This is what we'll be looking for. If multiple files are found in this manner, a list of paths is returned. If only 1 file was found, the string representing the filepath will be returned. 
+    Parameters
+    ----------
+    filt: str, list
+        tag for files we need to select. Now also support a list of multiple filters. 
+    path: str
+        path to the directory from which we need to remove files
+    return_msg: str, optional
+        whether to raise an error (*return_msg='error') or return None (*return_msg=None*). Default = 'error'.
+    exclude: str, optional:
+        Specify string to exclude from options. This criteria will be ensued after finding files that conform to `filt` as final filter.
+    Returns
+    ----------
+    str
+        path to the files containing `string`. If no files could be found, `None` is returned
+    list
+        list of paths if multiple files were found
+    Raises
+    ----------
+    FileNotFoundError
+        If no files usingn the specified filters could be found
+    Example
+    ----------
+    >>> get_file_from_substring("R2", "/path/to/prf")
+    '/path/to/prf/r2.npy'
+    >>> get_file_from_substring(['gauss', 'best_vertices'], "path/to/pycortex/sub-xxx")
+    '/path/to/pycortex/sub-xxx/sub-xxx_model-gauss_desc-best_vertices.csv'
+    >>> get_file_from_substring(['best_vertices'], "path/to/pycortex/sub-xxx")
+    ['/path/to/pycortex/sub-xxx/sub-xxx_model-gauss_desc-best_vertices.csv',
+    '/path/to/pycortex/sub-xxx/sub-xxx_model-norm_desc-best_vertices.csv']    
+    """
+    
+    input_is_list = False
+    if isinstance(filt, str):
+        filt = [filt]
+
+    if isinstance(filt, list):
+        # list and sort all files in the directory
+        if isinstance(path, str):
+            files_in_directory = sorted(os.listdir(path))
+        elif isinstance(path, list):
+            input_is_list = True
+            files_in_directory = path.copy()
+        else:
+            raise ValueError("Unknown input type; should be string to path or list of files")
+
+        # the idea is to create a binary matrix for the files in 'path', loop through the filters, and find the row where all values are 1
+        filt_array = np.zeros((len(files_in_directory), len(filt)))
+        for ix,f in enumerate(files_in_directory):
+            for filt_ix,filt_opt in enumerate(filt):
+                filt_array[ix,filt_ix] = filt_opt in f
+
+        # now we have a binary <number of files x number of filters> array. If all filters were available in a file, the entire row should be 1, 
+        # so we're going to look for those rows
+        full_match = np.ones(len(filt))
+        full_match_idc = np.where(np.all(filt_array==full_match,axis=1))[0]
+
+        if len(full_match_idc) == 1:
+            fname = files_in_directory[full_match_idc[0]]
+            if input_is_list:
+                return fname
+            else:
+                f = op.join(path, fname)
+                if exclude != None:
+                    if exclude not in f:
+                        return op.join(path, fname)
+                    else:
+                        if return_msg == "error":
+                            raise FileNotFoundError(f"Could not find file with filters: {filt} and exclusion of [{exclude}] in '{path}'")
+                        else:
+                            return None
+                else:
+                    return op.join(path, fname)
+                
+        elif len(full_match_idc) > 1:
+            match_list = []
+            for match in full_match_idc:
+                fname = files_in_directory[match]
+                if input_is_list:
+                    match_list.append(fname)         
+                else:
+                    match_list.append(op.join(path, fname))
+            if exclude != None:
+                return [f for f in match_list if exclude not in f]
+            else:
+                return match_list
+            # return match_list
+        else:
+            if return_msg == "error":
+                raise FileNotFoundError(f"Could not find file with filters: {filt} in {path}")
+            else:
+                return None        
