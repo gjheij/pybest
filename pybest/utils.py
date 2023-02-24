@@ -29,12 +29,16 @@ def load_gifti(f, cfg, return_tr=True):
     f_gif = nib.load(f)
     data = np.vstack([arr.data for arr in f_gif.darrays])
     start_tr = [item[1] if isinstance(item[0], str) else 0 for item in cfg.get('skip_tr')][0]
-    tr = float(f_gif.darrays[0].get_metadata()['TimeStep'])
+
+    try:
+        tr = float(f_gif.darrays[0].get_metadata()['TimeStep'])
+    except:
+        tr = float(f_gif.darrays[0].metadata['TimeStep'])
+
     if return_tr:
         return data[start_tr:,:], tr
     else:
         return data[start_tr:,:]
-
 
 def load_and_split_cifti(cifti, indices_file, cfg, left_id=None, right_id=None, subc_id=None, mode='surface', return_tr=True):
     """
