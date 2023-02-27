@@ -202,12 +202,12 @@ def find_data(cfg, logger):
     funcs = get_file_from_substring(idf, ffunc_dir)
     if isinstance(funcs, str):
         funcs = [funcs]
-
+    
     # search based on regexp entertained by the fMRIPrep version used to preprocess the data
     confs = get_file_from_substring([f'task-{task}', 'confounds', 'tsv'], ffunc_dir)
     if isinstance(confs, str):
         confs = [confs]
-
+        
     # Find event files, which should be in the BIDS dir
     bids_dir = cfg['bids_dir']
     if bids_dir is not None:
