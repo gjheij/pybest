@@ -185,7 +185,7 @@ def find_data(cfg, logger):
     if cfg['pool_sessions']:
         ses = '*'  # wilcard for globbing across sessions
     
-    idf = ["task-", f"space-{space}"]
+    idf = [f"task-{task}", f"space-{space}"]
     # idf = identifier for files
     if cfg['iscifti'] == 'y':
         idf += ['.dtseries.nii'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
