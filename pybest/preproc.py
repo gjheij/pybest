@@ -13,8 +13,14 @@ from sklearn.linear_model import LinearRegression
 
 from .logging import tqdm_ctm, tdesc
 from .models import cross_val_r2
-from .utils import load_gifti, get_frame_times, create_design_matrix, hp_filter, save_data, load_and_split_cifti
-
+from .utils import (
+    load_gifti, 
+    get_frame_times, 
+    create_design_matrix, 
+    hp_filter, 
+    save_data, 
+    load_and_split_cifti,
+    split_bids_components)
 
 def preprocess_funcs(ddict, cfg, logger):
     """ Preprocesses a set of functional files (either volumetric nifti or
@@ -94,9 +100,24 @@ def _run_func_parallel(ddict, cfg, run, func, logger):
     # Add to run index
     run_idx = np.ones(data.shape[0]) * run
 
+    # get file components to make pybest agnostic to run numbering
+    run_id = run+1
+    bids_comps = split_bids_components(func)
+    if len(bids_comps) > 0:
+        if "run" in list(bids_comps.keys()):
+            run_id = bids_comps["run"]
+
     if cfg['save_all']:  # Save run-wise data as niftis for inspection
-        save_data(data, cfg, ddict, par_dir='preproc', run=run+1, nii=True,
-                  desc='preproc', dtype='bold', skip_if_single_run=True)
+        save_data(
+            data, 
+            cfg, 
+            ddict, 
+            par_dir='preproc', 
+            run=run_id, 
+            nii=True,
+            desc='preproc', 
+            dtype='bold', 
+            skip_if_single_run=True)
 
     return data, run_idx, tr
 
@@ -165,7 +186,14 @@ def preprocess_confs_fmriprep(ddict, cfg, logger):
     out_dir = op.join(cfg['save_dir'], 'preproc')
     if cfg['save_all']:
         for i, data in enumerate(data_):
-            f_out = op.join(out_dir, cfg['f_base'] + f'_run-{i+1}_desc-preproc_conf.tsv')
+            # get file components to make pybest agnostic to run numbering
+            run_id = i+1
+            bids_comps = split_bids_components(ddict['confs'][i])
+            if len(bids_comps) > 0:
+                if "run" in list(bids_comps.keys()):
+                    run_id = bids_comps["run"]
+
+            f_out = op.join(out_dir, cfg['f_base'] + f'_run-{run_id}_desc-preproc_conf.tsv')
             data.to_csv(f_out, sep='\t', index=False)
 
     # Concatenate DataFrames and save

@@ -13,7 +13,7 @@ from sklearn.model_selection import RepeatedKFold, LeaveOneGroupOut
 
 from .logging import tqdm_ctm, tdesc
 from .utils import get_run_data, get_frame_times, create_design_matrix, hp_filter
-from .utils import save_data, load_gifti, custom_clean, argmax_regularized, load_and_split_cifti
+from .utils import save_data, load_gifti, custom_clean, argmax_regularized, load_and_split_cifti, split_bids_components
 from .models import cross_val_r2
 
 
@@ -84,8 +84,16 @@ def run_noise_processing(ddict, cfg, logger):
             for run in range(n_runs):
                 r2_ncomps = r2[run, :, :]
                 r2_max = r2_ncomps.max(axis=0)
-                save_data(r2_max, cfg, ddict, par_dir='denoising', run=run+1, nii=True, desc='max', dtype='r2')
-                save_data(r2_ncomps, cfg, ddict, par_dir='denoising', run=run+1, nii=True, desc='ncomps', dtype='r2')
+                
+                # get file components to make pybest agnostic to run numbering
+                run_id = run+1
+                bids_comps = split_bids_components(ddict["funcs"][run])
+                if len(bids_comps) > 0:
+                    if "run" in list(bids_comps.keys()):
+                        run_id = bids_comps["run"]
+
+                save_data(r2_max, cfg, ddict, par_dir='denoising', run=run_id, nii=True, desc='max', dtype='r2')
+                save_data(r2_ncomps, cfg, ddict, par_dir='denoising', run=run_id, nii=True, desc='ncomps', dtype='r2')
         else:
             # Per-run optimal n-comps
             ddict['opt_n_comps'] = n_comps[argmax_regularized(r2, axis=1, percent=cfg['argmax_percent'])]
@@ -96,6 +104,13 @@ def run_noise_processing(ddict, cfg, logger):
                 # Compute maximum r2 across n-comps
                 r2_max = r2_ncomps.max(axis=0)
 
+                # get file components to make pybest agnostic to run numbering
+                run_id = run+1
+                bids_comps = split_bids_components(ddict["funcs"][run])
+                if len(bids_comps) > 0:
+                    if "run" in list(bids_comps.keys()):
+                        run_id = bids_comps["run"]
+
                 # Whenever r2 < 0, set opt_n_comps to zero (no denoising)
                 ddict['opt_n_comps'][run, r2_max < 0] = 0
 
@@ -104,7 +119,7 @@ def run_noise_processing(ddict, cfg, logger):
                         opt_n_comps = ddict['opt_n_comps'][run, :]
                         to_save = [(r2_ncomps, 'ncomps', 'r2'), (r2_max, 'max', 'r2'), (opt_n_comps, 'opt', 'ncomps')]
                         for data, desc, dtype in to_save:
-                            save_data(data, cfg, ddict, par_dir='denoising', run=run+1, desc=desc, dtype=dtype, nii=True)
+                            save_data(data, cfg, ddict, par_dir='denoising', run=run_id, desc=desc, dtype=dtype, nii=True)
 
     else:  # between-run, GLMdenoise style denoising
         # Also check 0 components!
@@ -154,6 +169,13 @@ def run_noise_processing(ddict, cfg, logger):
     func_clean = ddict['preproc_func'].copy()
     for run in tqdm_ctm(range(n_runs), tdesc('Denoising funcs: ')):
 
+        # get file components to make pybest agnostic to run numbering
+        run_id = run+1
+        bids_comps = split_bids_components(ddict["funcs"][run])
+        if len(bids_comps) > 0:
+            if "run" in list(bids_comps.keys()):
+                run_id = bids_comps["run"]
+
         # If we have a run-specific optimal n-comps, use it
         if ddict['opt_n_comps'].ndim > 1:
             opt_n_comps = ddict['opt_n_comps'][run, :]
@@ -184,7 +206,7 @@ def run_noise_processing(ddict, cfg, logger):
 
         # Save denoised data
         if cfg['save_all']:
-            save_data(func, cfg, ddict, par_dir='denoising', run=run+1, desc='denoised',
+            save_data(func, cfg, ddict, par_dir='denoising', run=run_id, desc='denoised',
                       dtype='bold', skip_if_single_run=True, nii=True)
 
     # Always save full denoised timeseries (and optimal number of components for each run)
@@ -208,9 +230,16 @@ def _run_parallel_within_run(run, ddict, cfg, logger, n_comps, cv):
     # Pre-allocate R2-scores (components x voxels)
     r2s = np.zeros((n_comps.size, func.shape[1]))
 
+    # get file components to make pybest agnostic to run numbering
+    run_id = run+1
+    bids_comps = split_bids_components(ddict["funcs"][run])
+    if len(bids_comps) > 0:
+        if "run" in list(bids_comps.keys()):
+            run_id = bids_comps["run"]
+            
     # Loop over number of components
     model = LinearRegression(fit_intercept=False, n_jobs=1)
-    for i, n_comp in enumerate(tqdm_ctm(n_comps, tdesc(f'Noise proc run {run+1}:'))):
+    for i, n_comp in enumerate(tqdm_ctm(n_comps, tdesc(f'Noise proc run {run_id}:'))):
         # Check number of components
         if n_comp > conf.shape[1]:
             raise ValueError(f"Cannot select {n_comp} variables from conf data with {conf.shape[1]} components.")

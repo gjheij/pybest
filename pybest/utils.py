@@ -458,8 +458,15 @@ def get_run_data(ddict, run, func_type='preproc'):
     func = ddict[f'{func_type}_func'][t_idx, :].copy()
     conf = ddict['preproc_conf'].copy().loc[t_idx, :].to_numpy()
 
+    # get file components to make pybest agnostic to run numbering
+    run_id = run+1
+    bids_comps = split_bids_components(ddict["funcs"][run])
+    if len(bids_comps) > 0:
+        if "run" in list(bids_comps.keys()):
+            run_id = bids_comps["run"]
+            
     if ddict['preproc_events'] is not None:
-        events = ddict['preproc_events'].copy().query("run == (@run + 1)")
+        events = ddict['preproc_events'].copy().query("run == (@run_id)")
     else:
         events = None
 
@@ -765,4 +772,31 @@ def get_file_from_substring(filt, path, return_msg='error', exclude=None):
             if return_msg == "error":
                 raise FileNotFoundError(f"Could not find file with filters: {filt} in {path}")
             else:
-                return None        
+                return None
+            
+def split_bids_components(fname):
+
+    comp_list = fname.split('_')
+    comps = {}
+    
+    ids = ['sub', 'ses', 'task', 'acq', 'rec', 'run', 'space', 'hemi', 'model', 'stage', 'desc', 'vox']
+    for el in comp_list:
+        for i in ids:
+            if i in el:
+                comp = el.split('-')[-1]
+
+                if "." in comp:
+                    ic = comp.index(".")
+                    if ic > 0:
+                        ex = 0
+                    else:
+                        ex = -1
+
+                    comp = comp.split(".")[ex]
+                
+                # if i == "run":
+                #     comp = int(comp)
+
+                comps[i] = comp
+
+    return comps
