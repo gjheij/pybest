@@ -41,4 +41,5 @@ MAJOR = _version_major
 MINOR = _version_minor
 MICRO = _version_micro
 VERSION = __version__
+REQUIRES = ["numpy", "scipy", "matplotlib", "pandas","joblib","toml", "nilearn"]
 PACKAGE_DATA = {}#'pybest': [op.join('data', '*.tsv')]}

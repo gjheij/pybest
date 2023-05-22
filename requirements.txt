@@ -2,6 +2,6 @@ numpy
 scipy
 matplotlib
 pandas
-sklearn
 joblib
 toml
+scikit-learn

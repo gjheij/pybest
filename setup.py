@@ -4,16 +4,12 @@ PACKAGES = find_packages()
 
 # Get version and release info, which is all stored in shablona/version.py
 ver_file = os.path.join('pybest', 'version.py')
-
 with open(ver_file) as f:
     exec(f.read())
 
 # Long description will go up on the pypi page
 with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
-
-with open('requirements.txt') as f:
-    REQUIRES = f.readlines()
 
 opts = dict(
     name=NAME,
