@@ -107,16 +107,23 @@ def main(fprep_dir, bids_dir, atlas_file, left_id, right_id, subc_id, out_dir, s
                 
                 # Some bookkeeping
                 if iscifti == 'y':
-                    space_idf = space
+                    space_idf = f"_space-{space}"
                 else:
-                    space_idf = f'{space}_hemi-{hemi}' if 'fs' in space else space
+                    if space != "func":
+                        if "fs" in space:
+                            space_idf = f'_space-{space}_hemi-{hemi}'
+                        else:
+                            space_idf = f"_space-{space}"
+                    else:
+                        # func doesn't have space-tag
+                        space_idf = "" 
 
                 # f_base: base for output files
                 if ses is None:  # no separate session output dir
-                    cfg['f_base'] = f"sub-{sub}_task-{task}_space-{space_idf}"
+                    cfg['f_base'] = f"sub-{sub}_task-{task}{space_idf}"
                     cfg['save_dir'] = op.join(cfg['out_dir'], f'sub-{sub}')
                 else:
-                    cfg['f_base'] = f"sub-{sub}_ses-{ses}_task-{task}_space-{space_idf}"
+                    cfg['f_base'] = f"sub-{sub}_ses-{ses}_task-{task}{space_idf}"
                     cfg['save_dir'] = op.join(cfg['out_dir'], f'sub-{sub}', f'ses-{ses}')
                 
                 for key, value in [('sub', sub), ('ses', ses), ('task', task)]:

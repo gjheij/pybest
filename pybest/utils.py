@@ -243,10 +243,18 @@ def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
         os.makedirs(save_dir, exist_ok=True)
 
     sub, ses, task, space, hemi = cfg['c_sub'], cfg['c_ses'], cfg['c_task'], cfg['space'], cfg['hemi']
-    if cfg['iscifti'] == 'y':
-        space_idf = space
+    # Some bookkeeping
+    if cfg["iscifti"] == 'y':
+        space_idf = f"_space-{space}"
     else:
-        space_idf = f'{space}_hemi-{hemi}' if 'fs' in space else space
+        if space != "func":
+            if "fs" in space:
+                space_idf = f'_space-{space}_hemi-{hemi}'
+            else:
+                space_idf = f"_space-{space}"
+        else:
+            # func doesn't have space-tag
+            space_idf = "" 
 
     if ses is None:  # no separate session output dir
         f_base = f"sub-{sub}_task-{task}"
@@ -254,11 +262,11 @@ def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
         f_base = f"sub-{sub}_ses-{ses}_task-{task}"
         
     if run is None:
-        f_out = op.join(save_dir, f_base + f'_space-{space_idf}_desc-{desc}_{dtype}')
+        f_out = op.join(save_dir, f_base + f'{space_idf}_desc-{desc}_{dtype}')
         runs = len(ddict['funcs'])
         tr = int(data.shape[0]/runs)
     else:
-        f_out = op.join(save_dir, f_base + f'_run-{run}_space-{space_idf}_desc-{desc}_{dtype}')
+        f_out = op.join(save_dir, f_base + f'_run-{run}{space_idf}_desc-{desc}_{dtype}')
 
     if ext == 'tsv':
         data.to_csv(f_out + '.tsv', sep='\t', index=False)
@@ -343,11 +351,15 @@ def hp_filter(data, tr, ddict, cfg, standardize=True):
     n_vol = data.shape[0]
     st_ref = cfg['slice_time_ref']  # offset frametimes by st_ref * tr
     ft = np.linspace(st_ref * tr, (n_vol + st_ref) * tr, n_vol, endpoint=False)
+    
     # Create high-pass filter and clean
     if cfg['high_pass_type'] == 'dct':
         hp_set = dct_set(cfg['high_pass'], ft)
-        data = signal.clean(data, detrend=False,
-                            standardize=standardize, confounds=hp_set)
+        data = signal.clean(
+            data, 
+            detrend=False,
+            standardize=standardize, 
+            confounds=hp_set)
     else:  # savgol, hardcode polyorder (maybe make argument?)
         window = int(np.round((1 / cfg['high_pass']) / tr))
         data -= savgol_filter(data, window_length=window, polyorder=2, axis=0)

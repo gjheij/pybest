@@ -88,11 +88,19 @@ def find_exp_parameters(cfg, logger):
     """ Extracts experimental parameters. """
 
     hemi, space = cfg['hemi'], cfg['space']
-    idf = [f"space-{space}"]
-    if cfg['iscifti'] == 'y':
-        idf += ['.dtseries.nii'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
+
+    # func space doesn't have space-tag; exclude "space-" from search
+    if space != "func":
+        exclude = None
+        idf = [f"space-{space}"]
     else:
-        idf += [f"hemi-{hemi}", "func.gii"] if 'fs' in space else 'desc-preproc_bold.nii.gz'
+        idf = []
+        exclude = "space-"
+
+    if cfg['iscifti'] == 'y':
+        idf += ['.dtseries.nii'] if 'fs' in space else ['desc-preproc_bold.nii.gz']
+    else:
+        idf += [f"hemi-{hemi}", "func.gii"] if 'fs' in space else ['desc-preproc_bold.nii.gz']
 
     # Use all possible participants if not provided
     if cfg['subject'] is None:
@@ -134,7 +142,7 @@ def find_exp_parameters(cfg, logger):
                 else:
                     this_ses_dir = op.join(cfg['fprep_dir'], f'sub-{this_sub}', f'ses-{this_ses}', 'func')
 
-                tmp = get_file_from_substring(idf, this_ses_dir)
+                tmp = get_file_from_substring(idf, this_ses_dir, exclude=exclude)
                 these_ses_task = list(set(
                     [op.basename(f).split('task-')[1].split('_')[0]
                      for f in tmp]
@@ -159,7 +167,7 @@ def find_exp_parameters(cfg, logger):
                 else:
                     this_ses_dir = op.join(cfg['fprep_dir'], f'sub-{this_sub}', f'ses-{this_ses}', 'func')
 
-                tmp = get_file_from_substring(idf, this_ses_dir)
+                tmp = get_file_from_substring(idf, this_ses_dir, exclude=exclude)
                 if tmp:
                     these_task.append([cfg['task']])
                 else:
@@ -185,12 +193,18 @@ def find_data(cfg, logger):
     if cfg['pool_sessions']:
         ses = '*'  # wilcard for globbing across sessions
     
-    idf = [f"task-{task}", f"space-{space}"]
+    # func doesn't have space-tag
+    idf = [f"task-{task}"]
+    exclude = "space-"
+    if space != "func":
+        idf+=[f"space-{space}"]
+        exclude = None
+
     # idf = identifier for files
     if cfg['iscifti'] == 'y':
-        idf += ['.dtseries.nii'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
+        idf += ['.dtseries.nii'] if 'fs' in space else ['desc-preproc_bold.nii.gz']
     else:
-        idf += [f'hemi-{hemi}', '.func.gii'] if 'fs' in space else 'desc-preproc_bold.nii.gz'
+        idf += [f'hemi-{hemi}', '.func.gii'] if 'fs' in space else ['desc-preproc_bold.nii.gz']
 
     # Gather funcs, confs, tasks
     fprep_dir = cfg['fprep_dir']
@@ -199,7 +213,7 @@ def find_data(cfg, logger):
     else:
         ffunc_dir = op.join(fprep_dir, f'sub-{sub}', f'ses-{ses}', 'func')
 
-    funcs = get_file_from_substring(idf, ffunc_dir)
+    funcs = get_file_from_substring(idf, ffunc_dir, exclude=None)
     if isinstance(funcs, str):
         funcs = [funcs]
     
@@ -207,7 +221,7 @@ def find_data(cfg, logger):
     confs = get_file_from_substring([f'task-{task}', 'confounds', 'tsv'], ffunc_dir)
     if isinstance(confs, str):
         confs = [confs]
-        
+
     # Find event files, which should be in the BIDS dir
     bids_dir = cfg['bids_dir']
     if bids_dir is not None:
