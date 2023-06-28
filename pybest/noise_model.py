@@ -207,7 +207,7 @@ def run_noise_processing(ddict, cfg, logger):
         # Save denoised data
         if cfg['save_all']:
             save_data(func, cfg, ddict, par_dir='denoising', run=run_id, desc='denoised',
-                      dtype='bold', skip_if_single_run=True, nii=True)
+                      dtype='bold', skip_if_single_run=False, nii=True)
 
     # Always save full denoised timeseries (and optimal number of components for each run)
     save_data(func_clean, cfg, ddict, par_dir='denoising', run=None, desc='denoised', dtype='bold', nii=False)

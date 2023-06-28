@@ -117,7 +117,7 @@ def _run_func_parallel(ddict, cfg, run, func, logger):
             nii=True,
             desc='preproc', 
             dtype='bold', 
-            skip_if_single_run=True)
+            skip_if_single_run=False)
 
     return data, run_idx, tr
 
