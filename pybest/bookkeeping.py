@@ -96,7 +96,7 @@ def find_exp_parameters(cfg, logger):
     else:
         idf = []
         exclude = "space-"
-
+    
     if cfg['iscifti'] == 'y':
         idf += ['.dtseries.nii'] if 'fs' in space else ['desc-preproc_bold.nii.gz']
     else:
@@ -213,7 +213,7 @@ def find_data(cfg, logger):
     else:
         ffunc_dir = op.join(fprep_dir, f'sub-{sub}', f'ses-{ses}', 'func')
 
-    funcs = get_file_from_substring(idf, ffunc_dir, exclude=None)
+    funcs = get_file_from_substring(idf, ffunc_dir, exclude=exclude)
     if isinstance(funcs, str):
         funcs = [funcs]
     
@@ -245,7 +245,7 @@ def find_data(cfg, logger):
 
     # Number of funcs and confs (and possibly events) should be the same
     if not all(len(funcs) == len(tmp) for tmp in to_check):
-        msg = f"Found unequal number of funcs ({len(funcs)}) and confs ({len(confs)})"
+        msg = f"Found unequal number of funcs ({len(funcs)}: {funcs}) and confs ({len(confs)}: {confs})"
         if events is not None:
             msg += f" and events ({len(events)})"
 
