@@ -18,8 +18,12 @@ from nilearn.glm.first_level import run_glm
 from sklearn.linear_model import LinearRegression
 from nilearn.glm.first_level.experimental_paradigm import check_events
 from nilearn.glm.first_level.design_matrix import make_first_level_design_matrix
-from nilearn.glm.first_level.hemodynamic_models import _sample_condition, _resample_regressor
-from nilearn.glm.first_level.design_matrix import _cosine_drift as dct_set
+from nilearn.glm.first_level.hemodynamic_models import _sample_condition,
+
+try:
+    from nilearn.glm.first_level.design_matrix import _cosine_drift as dct_set
+except Exception:
+    from nilearn.glm.first_level.design_matrix import create_cosine_drift as dct_set
 
 from .constants import HRFS_HR
 
