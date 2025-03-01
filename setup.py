@@ -26,7 +26,6 @@ opts = dict(
     platforms=PLATFORMS,
     version=VERSION,
     packages=PACKAGES,
-    package_data=PACKAGE_DATA,
     install_requires=REQUIRES,
     requires=REQUIRES,
     entry_points={
@@ -36,7 +35,12 @@ opts = dict(
             'pybest_npy2mgz=pybest.utils:pybest_npy2mgz',
             'pybest_vol2surf=pybest.utils:pybest_vol2surf'
             ]
-        }
+        },
+    package_data={
+        'pybest': [
+            'data/*',
+        ]
+    }
 )
 
 if __name__ == '__main__':
