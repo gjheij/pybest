@@ -18,7 +18,7 @@ from nilearn.glm.first_level import run_glm
 from sklearn.linear_model import LinearRegression
 from nilearn.glm.first_level.experimental_paradigm import check_events
 from nilearn.glm.first_level.design_matrix import make_first_level_design_matrix
-from nilearn.glm.first_level.hemodynamic_models import _sample_condition,
+from nilearn.glm.first_level.hemodynamic_models import _sample_condition
 
 try:
     from nilearn.glm.first_level.design_matrix import _cosine_drift as dct_set
