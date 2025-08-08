@@ -55,6 +55,10 @@ def preprocess_funcs(ddict, cfg, logger):
         for run, func in enumerate(tqdm_ctm(ddict['funcs'], tdesc('Preprocessing funcs:')))
     )
     
+    # Extract TRs
+    ddict['trs'] = [o[2] for o in out]
+    logger.info(f"Found the following TRs across runs: {ddict['trs']}")
+
     # Concatenate data in time dimension
     data = np.vstack([d[0] for d in out])
     run_idx = np.concatenate([r[1] for r in out]).astype(int)
@@ -65,10 +69,6 @@ def preprocess_funcs(ddict, cfg, logger):
     # Save run_idx
     out_dir = op.join(cfg['save_dir'], 'preproc')
     np.save(op.join(out_dir, f"task-{cfg['c_task']}_run_idx.npy"), run_idx)
-
-    # Extract TRs
-    ddict['trs'] = [o[2] for o in out]
-    logger.info(f"Found the following TRs across runs: {ddict['trs']}")
     
     # Save mask
     save_data(ddict['mask'], cfg, ddict, par_dir='preproc', run=None, desc='preproc', dtype='mask', nii=True)

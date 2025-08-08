@@ -1,18 +1,14 @@
-import os
 import os.path as op
 import numpy as np
 import pandas as pd
 import nibabel as nib
-from tqdm import tqdm
-from glob import glob
-from nilearn import masking, signal, image
+from nilearn import masking, signal
 from joblib import Parallel, delayed
-from sklearn.metrics import r2_score
-from sklearn.linear_model import Ridge, LinearRegression
+from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import RepeatedKFold, LeaveOneGroupOut
 
 from .logging import tqdm_ctm, tdesc
-from .utils import get_run_data, get_frame_times, create_design_matrix, hp_filter
+from .utils import get_run_data, get_frame_times, create_design_matrix
 from .utils import save_data, load_gifti, custom_clean, argmax_regularized, load_and_split_cifti, split_bids_components
 from .models import cross_val_r2
 
@@ -206,8 +202,7 @@ def run_noise_processing(ddict, cfg, logger):
 
         # Save denoised data
         if cfg['save_all']:
-            save_data(func, cfg, ddict, par_dir='denoising', run=run_id, desc='denoised',
-                      dtype='bold', skip_if_single_run=False, nii=True)
+            save_data(func, cfg, ddict, par_dir='denoising', run=run_id, desc='denoised', dtype='bold', skip_if_single_run=False, nii=True, write_json=True)
 
     # Always save full denoised timeseries (and optimal number of components for each run)
     save_data(func_clean, cfg, ddict, par_dir='denoising', run=None, desc='denoised', dtype='bold', nii=False)
