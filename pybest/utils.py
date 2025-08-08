@@ -1,6 +1,6 @@
 import os
+import json
 import click
-import datetime
 import subprocess
 import os.path as op
 import numpy as np
@@ -8,14 +8,11 @@ import nibabel as nib
 import pandas as pd
 import h5py
 import re
-from tqdm import tqdm
-from glob import glob
 from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 from nilearn import plotting, signal, masking
 from nilearn.datasets import fetch_surf_fsaverage
 from nilearn.glm.first_level import run_glm
-from sklearn.linear_model import LinearRegression
 from nilearn.glm.first_level.experimental_paradigm import check_events
 from nilearn.glm.first_level.design_matrix import make_first_level_design_matrix
 from nilearn.glm.first_level.hemodynamic_models import _sample_condition
@@ -210,7 +207,7 @@ def argmax_regularized(data, axis=0, percent=5):
 
 
 def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
-              skip_if_single_run=False, nii=False):
+              skip_if_single_run=False, nii=False, write_json=False, **kwargs):
     """ Saves data as either numpy files (for fs* space data) or
     gzipped nifti (.nii.gz; for volumetric data).
 
@@ -271,7 +268,12 @@ def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
         tr = int(data.shape[0]/runs)
     else:
         f_out = op.join(save_dir, f_base + f'_run-{run}{space_idf}_desc-{desc}_{dtype}')
-
+        
+        try:
+            tr = ddict["trs"][run-1]
+        except:
+            tr = 1
+            
     if ext == 'tsv':
         data.to_csv(f_out + '.tsv', sep='\t', index=False)
         return None
@@ -342,7 +344,38 @@ def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
         if nii:  # save as volume
             if not isinstance(data, nib.Nifti1Image):
                 data = masking.unmask(data, ddict['mask'])
+
+            # set TR
+            if data.ndim == 4:
+                current_tr = data.header['pixdim'][4]
+                if abs(current_tr - tr) > 1e-6:
+                    data.header['pixdim'][4] = tr
+
             data.to_filename(f_out + '.nii.gz')
+
+            # write json file with relevant info
+            if write_json:
+                json_dict = {
+                    "RepetitionTime": float(tr),
+                    "SkullStripped": True,
+                    "TaskName": task,
+                    "Sources": [
+                        ddict["funcs"][run-1],
+                        ddict["confs"][run-1] if "confs" in ddict else None
+                    ],
+                    "NumberOfComponents": cfg["n_comps"],
+                    "CVSplits": cfg["cv_splits"],
+                    "NoiseProcType": cfg["noiseproc_type"],
+                    "NoiseSource": cfg["noise_source"],
+                    "NumberOfProcesses": cfg["n_cpus"],
+                    "DecompositionMethod": cfg["decomp"]
+                }
+
+                json_dict = generate_sanitized_metadata(json_dict)
+                json_file = f"{f_out}.json"
+                with open(json_file, "w") as j:
+                    json.dump(json_dict, j, indent=4)
+
         else:  # save as npy (faster/less disk space)
             if isinstance(data, nib.Nifti1Image):
                 data = masking.apply_mask(data, ddict['mask'])
@@ -810,9 +843,31 @@ def split_bids_components(fname):
 
                     comp = comp.split(".")[ex]
                 
-                # if i == "run":
-                #     comp = int(comp)
+                if i == "run":
+                    comp = int(comp)
 
                 comps[i] = comp
 
     return comps
+
+def generate_sanitized_metadata(ddict):
+    import json
+
+    def safe_val(val):
+        # Convert to serializable types
+        if isinstance(val, (int, float, str, bool, type(None))):
+            return val
+        if isinstance(val, (list, tuple)):
+            return [safe_val(v) for v in val]
+        if isinstance(val, dict):
+            return {str(k): safe_val(v) for k, v in val.items()}
+        # Fallback to string
+        return str(val)
+
+    out = {}
+
+    # Add other kwargs like Conditions, etc.
+    for k, v in ddict.items():
+        out[k] = safe_val(v)
+
+    return out
