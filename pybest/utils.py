@@ -265,14 +265,12 @@ def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
     if run is None:
         f_out = op.join(save_dir, f_base + f'{space_idf}_desc-{desc}_{dtype}')
         runs = len(ddict['funcs'])
-        tr = int(data.shape[0]/runs)
+        tr = int(data.shape[0] / runs)
     else:
         f_out = op.join(save_dir, f_base + f'_run-{run}{space_idf}_desc-{desc}_{dtype}')
-        
-        try:
-            tr = ddict["trs"][run-1]
-        except:
-            tr = 1
+
+        # get TR based on index/runID
+        tr = get_by_run_or_single(ddict, "trs", run, default=1)
             
     if ext == 'tsv':
         data.to_csv(f_out + '.tsv', sep='\t', index=False)
@@ -355,13 +353,16 @@ def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
 
             # write json file with relevant info
             if write_json:
+                func_source = get_by_run_or_single(ddict, "funcs", run)
+                conf_source = get_by_run_or_single(ddict, "confs", run)
+
                 json_dict = {
                     "RepetitionTime": float(tr),
                     "SkullStripped": True,
                     "TaskName": task,
                     "Sources": [
-                        ddict["funcs"][run-1],
-                        ddict["confs"][run-1] if "confs" in ddict else None
+                        func_source,
+                        conf_source
                     ],
                     "NumberOfComponents": cfg["n_comps"],
                     "CVSplits": cfg["cv_splits"],
@@ -381,6 +382,19 @@ def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
                 data = masking.apply_mask(data, ddict['mask'])
             np.save(f_out + '.npy', data)
 
+
+def get_by_run_or_single(ddict, key, run, default=None):
+    vals = ddict.get(key, [])
+    if not vals:
+        return default
+
+    idx = 0 if len(vals) == 1 else run - 1
+
+    try:
+        return vals[idx]
+    except IndexError:
+        return default
+    
 
 def hp_filter(data, tr, ddict, cfg, standardize=True):
     """ High-pass filter (DCT or Savitsky-Golay). """
