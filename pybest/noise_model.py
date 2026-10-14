@@ -33,8 +33,14 @@ def run_noise_processing(ddict, cfg, logger):
             ddict['opt_n_comps'] = np.zeros((n_runs, K))
     
         # save mock opt_n_comps
-        save_data(ddict['opt_n_comps'], cfg, ddict, par_dir='denoising', run=None,
-                  desc='opt', dtype='ncomps', nii=True)
+        save_data(
+            ddict['opt_n_comps'], cfg, ddict,
+            par_dir='denoising',
+            run=None,
+            desc='opt',
+            dtype='ncomps',
+            nii=True
+        )
 
         return ddict
 
@@ -63,8 +69,14 @@ def run_noise_processing(ddict, cfg, logger):
 
             # Compute median across runs
             r2_median = np.median(r2, axis=0)  # median across runs
-            save_data(r2_median, cfg, ddict, par_dir='denoising', run=None,
-                      nii=True, desc='ncomps', dtype='medianr2')
+            save_data(
+                r2_median, cfg, ddict,
+                par_dir='denoising',
+                run=None,
+                nii=True,
+                desc='ncomps',
+                dtype='medianr2'
+            )
 
             # Maximum r2 across n-comps
             r2_max = r2_median.max(axis=0)
@@ -88,8 +100,16 @@ def run_noise_processing(ddict, cfg, logger):
                     if "run" in list(bids_comps.keys()):
                         run_id = bids_comps["run"]
 
-                save_data(r2_max, cfg, ddict, par_dir='denoising', run=run_id, nii=True, desc='max', dtype='r2')
-                save_data(r2_ncomps, cfg, ddict, par_dir='denoising', run=run_id, nii=True, desc='ncomps', dtype='r2')
+                for data, desc, dtype in [(r2_max, 'max', 'r2'), (r2_ncomps, 'ncomps', 'r2')]:
+                    save_data(
+                        data, cfg, ddict,
+                        par_dir='denoising',
+                        run=run_id, # can be string (e.g., '01')
+                        desc=desc,
+                        dtype=dtype,
+                        nii=True,
+                        run_idx=run # integer for indexing TRs
+                    )
         else:
             # Per-run optimal n-comps
             ddict['opt_n_comps'] = n_comps[argmax_regularized(r2, axis=1, percent=cfg['argmax_percent'])]
@@ -113,9 +133,22 @@ def run_noise_processing(ddict, cfg, logger):
                 if cfg['iscifti'] == 'n':
                     if cfg['save_all']:  # save per-run statistics
                         opt_n_comps = ddict['opt_n_comps'][run, :]
-                        to_save = [(r2_ncomps, 'ncomps', 'r2'), (r2_max, 'max', 'r2'), (opt_n_comps, 'opt', 'ncomps')]
+                        to_save = [
+                            (r2_ncomps, 'ncomps', 'r2'),
+                            (r2_max, 'max', 'r2'),
+                            (opt_n_comps, 'opt', 'ncomps')
+                        ]
+
                         for data, desc, dtype in to_save:
-                            save_data(data, cfg, ddict, par_dir='denoising', run=run_id, desc=desc, dtype=dtype, nii=True)
+                            save_data(
+                                data, cfg, ddict,
+                                par_dir='denoising',
+                                run=run_id, # can be string (e.g., '01')
+                                desc=desc,
+                                dtype=dtype,
+                                nii=True,
+                                run_idx=run # integer for indexing TRs
+                            )
 
     else:  # between-run, GLMdenoise style denoising
         # Also check 0 components!
@@ -148,13 +181,27 @@ def run_noise_processing(ddict, cfg, logger):
             opt_hrf_idx[idx] = r2[:, i, idx].argmax(axis=0)
 
         # Always save the following:
-        save_data(opt_hrf_idx, cfg, ddict, par_dir='denoising', run=None, desc='opt', dtype='hrf', nii=True)
-        save_data(opt_n_comps, cfg, ddict, par_dir='denoising', run=None, desc='opt', dtype='ncomps', nii=True)
+        for data, desc, dtype in [(r2_ncomps, 'ncomps', 'r2'), (r2_ncomps.max(axis=0), 'max', 'r2')]:
+            save_data(
+                data, cfg, ddict,
+                par_dir='denoising',
+                run=None,
+                desc=desc,
+                dtype=dtype,
+                nii=True
+            )
 
         if cfg['save_all']:
             to_save = [(r2_ncomps, 'ncomps', 'r2'), (r2_ncomps.max(axis=0), 'max', 'r2')]
             for data, desc, dtype in to_save:
-                save_data(data, cfg, ddict, par_dir='denoising', run=None, desc=desc, dtype=dtype, nii=True)
+                save_data(
+                    data, cfg, ddict,
+                    par_dir='denoising',
+                    run=None,
+                    desc=desc,
+                    dtype=dtype,
+                    nii=True
+                )
 
         ddict['opt_hrf_idx'] = opt_hrf_idx
         ddict['opt_n_comps'] = opt_n_comps
@@ -202,11 +249,28 @@ def run_noise_processing(ddict, cfg, logger):
 
         # Save denoised data
         if cfg['save_all']:
-            save_data(func, cfg, ddict, par_dir='denoising', run=run_id, desc='denoised', dtype='bold', skip_if_single_run=False, nii=True, write_json=True)
+            save_data(
+                func, cfg, ddict,
+                par_dir='denoising',
+                run=run_id,
+                desc='denoised',
+                dtype='bold',
+                skip_if_single_run=False,
+                nii=True,
+                write_json=True,
+                run_idx=run
+            )
 
     # Always save full denoised timeseries (and optimal number of components for each run)
-    save_data(func_clean, cfg, ddict, par_dir='denoising', run=None, desc='denoised', dtype='bold', nii=False)
-    save_data(ddict['opt_n_comps'], cfg, ddict, par_dir='denoising', run=None, desc='opt', dtype='ncomps', nii=True)
+    for data, desc, dtype in [(func_clean, 'denoised', 'bold'), (ddict['opt_n_comps'], 'opt', 'ncomps')]:
+        save_data(
+            data, cfg, ddict,
+            par_dir='denoising',
+            run=None,
+            desc=desc,
+            dtype=dtype,
+            nii=True
+        )
 
     ddict['denoised_func'] = func_clean
     return ddict

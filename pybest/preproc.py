@@ -62,16 +62,29 @@ def preprocess_funcs(ddict, cfg, logger):
     # Concatenate data in time dimension
     data = np.vstack([d[0] for d in out])
     run_idx = np.concatenate([r[1] for r in out]).astype(int)
-    
+
     # Save functional data, ALWAYS as npy file (saves time/disk space)
-    save_data(data, cfg, ddict, par_dir='preproc', run=None, desc='preproc', dtype='bold')
+    save_data(
+        data, cfg, ddict,
+        par_dir='preproc',
+        run=None,
+        desc='preproc',
+        dtype='bold'
+    )
 
     # Save run_idx
     out_dir = op.join(cfg['save_dir'], 'preproc')
     np.save(op.join(out_dir, f"task-{cfg['c_task']}_run_idx.npy"), run_idx)
     
     # Save mask
-    save_data(ddict['mask'], cfg, ddict, par_dir='preproc', run=None, desc='preproc', dtype='mask', nii=True)
+    save_data(
+        ddict['mask'], cfg, ddict,
+        par_dir='preproc',
+        run=None,
+        desc='preproc',
+        dtype='mask',
+        nii=True
+    )
 
     # Store in data-dictionary (ddict)
     ddict['preproc_func'] = data
@@ -117,7 +130,9 @@ def _run_func_parallel(ddict, cfg, run, func, logger):
             nii=True,
             desc='preproc', 
             dtype='bold', 
-            skip_if_single_run=False)
+            skip_if_single_run=False,
+            run_idx=run
+        )
 
     return data, run_idx, tr
 
@@ -274,22 +289,54 @@ def preprocess_confs_noise_pool(ddict, cfg, logger):
         data_.append(data)
 
     # Save data to disk
-    save_data(r2_max, cfg, ddict, par_dir='preproc', desc='max', dtype='r2', nii=True)
-    save_data(r2_max, cfg, ddict, par_dir='preproc', desc='max', dtype='r2', nii=True)
+    save_data(
+        r2_max, cfg, ddict,
+        par_dir='preproc',
+        desc='max',
+        dtype='r2',
+        nii=True
+    )
 
     if r2.shape[0] > 1:  # also save R2 per HRF    
-        save_data(r2, cfg, ddict, par_dir='preproc', run=None, desc='hrf', dtype='r2')
-    
+        save_data(
+            r2, cfg, ddict,
+            par_dir='preproc',
+            run=None,
+            desc='hrf',
+            dtype='r2'
+        )
+
+    # get file components to make pybest agnostic to run numbering
+    run_id = run+1
+    bids_comps = split_bids_components(ddict["funcs"][run])
+    if len(bids_comps) > 0:
+        if "run" in list(bids_comps.keys()):
+            run_id = bids_comps["run"]
+
     # Save some more stuff
     if cfg['save_all']:
         for run, data in enumerate(data_):
-            save_data(data, cfg, ddict, par_dir='preproc', run=run+1, desc='preproc',
-                      dtype='conf', ext='tsv', skip_if_single_run=True)
+            save_data(
+                data, cfg, ddict,
+                par_dir='preproc',
+                run=run_id,
+                desc='preproc',
+                dtype='conf',
+                ext='tsv',
+                skip_if_single_run=True,
+                run_idx=run
+            )
 
     # Concatenate DataFrames and save
     data = pd.concat(data_, axis=0)
-    save_data(data, cfg, ddict, par_dir='preproc', run=None, desc='preproc',
-              dtype='conf', ext='tsv')
+    save_data(
+        data, cfg, ddict,
+        par_dir='preproc',
+        run=None,
+        desc='preproc',
+        dtype='conf',
+        ext='tsv'
+    )
 
     ddict['preproc_conf'] = data
 
@@ -307,8 +354,13 @@ def preprocess_events(ddict, cfg, logger):
             match_data = [file if re.search(first_match[0], file, re.IGNORECASE) else 0 for file in ddict['funcs']][0]
             if 'fs' in cfg['space']:
                 if cfg['iscifti'] == 'y':
-                    actual_tr = load_and_split_cifti(match_data, cfg['atlas_file'], cfg['left_id'],
-                                                         cfg['right_id'], cfg['subc_id'])[1]
+                    actual_tr = load_and_split_cifti(
+                        match_data,
+                        cfg['atlas_file'],
+                        cfg['left_id'],
+                        cfg['right_id'],
+                        cfg['subc_id']
+                    )[1]
                 else:
                     actual_tr = load_gifti(match_data, cfg)[1]
             else:
@@ -360,11 +412,26 @@ def preprocess_events(ddict, cfg, logger):
         data = data.loc[:, first_cols + [c for c in data.columns if c not in first_cols]]
         data_.append(data)
 
+    # get file components to make pybest agnostic to run numbering
+    run_id = run+1
+    bids_comps = split_bids_components(ddict["funcs"][run])
+    if len(bids_comps) > 0:
+        if "run" in list(bids_comps.keys()):
+            run_id = bids_comps["run"]
+
     # Save stuff
     if cfg['save_all']:
         for run, data in enumerate(data_):
-            save_data(data, cfg, ddict, par_dir='preproc', run=run+1, desc='preproc',
-                      dtype='events', ext='tsv', skip_if_single_run=True)
+            save_data(
+                data, cfg, ddict,
+                par_dir='preproc',
+                run=run_id,
+                desc='preproc',
+                dtype='events',
+                ext='tsv',
+                skip_if_single_run=True,
+                run_idx=run
+            )
 
     # Adjust onsets for concatenated events file
     #for run in np.unique(ddict['run_idx']).astype(int):
@@ -390,7 +457,14 @@ def preprocess_events(ddict, cfg, logger):
             )
             break
 
-    save_data(data, cfg, ddict, par_dir='preproc', run=None, desc='preproc', dtype='events', ext='tsv')
+    save_data(
+        data, cfg, ddict,
+        par_dir='preproc',
+        run=None,
+        desc='preproc',
+        dtype='events',
+        ext='tsv'
+    )
 
     # Print some useful info about single-trials
     if cfg['single_trial_id'] is not None: 
@@ -424,8 +498,11 @@ def load_preproc_data(ddict, cfg):
     # Load in TRs (inefficient; maybe save/load as yaml?)
     if 'fs' in cfg['space']:
         if cfg['iscifti'] == 'y':
-            ddict['trs'] = [load_and_split_cifti(f, cfg['atlas_file'], cfg['left_id'],
-                                                 cfg['right_id'], cfg['subc_id'])[1] for f in ddict['funcs']]
+            ddict['trs'] = [
+                load_and_split_cifti(
+                    f, cfg['atlas_file'], cfg['left_id'],
+                    cfg['right_id'], cfg['subc_id']
+                )[1] for f in ddict['funcs']]
         else:
             ddict['trs'] = [load_gifti(f, cfg)[1] for f in ddict['funcs']]  # quite inefficient
     else:

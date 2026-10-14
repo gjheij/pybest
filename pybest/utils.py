@@ -206,7 +206,7 @@ def argmax_regularized(data, axis=0, percent=5):
     return (data >= cutoff).argmax(axis=axis)
 
 
-def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
+def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, run_idx=None, ext=None,
               skip_if_single_run=False, nii=False, write_json=False, **kwargs):
     """ Saves data as either numpy files (for fs* space data) or
     gzipped nifti (.nii.gz; for volumetric data).
@@ -270,7 +270,7 @@ def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
         f_out = op.join(save_dir, f_base + f'_run-{run}{space_idf}_desc-{desc}_{dtype}')
 
         # get TR based on index/runID
-        tr = get_by_run_or_single(ddict, "trs", run, default=1)
+        tr = get_by_run_or_single(ddict, "trs", run_idx, default=1)
             
     if ext == 'tsv':
         data.to_csv(f_out + '.tsv', sep='\t', index=False)
@@ -353,8 +353,8 @@ def save_data(data, cfg, ddict, par_dir, desc, dtype, run=None, ext=None,
 
             # write json file with relevant info
             if write_json:
-                func_source = get_by_run_or_single(ddict, "funcs", run)
-                conf_source = get_by_run_or_single(ddict, "confs", run)
+                func_source = get_by_run_or_single(ddict, "funcs", run_idx)
+                conf_source = get_by_run_or_single(ddict, "confs", run_idx)
 
                 json_dict = {
                     "RepetitionTime": float(tr),
@@ -837,12 +837,27 @@ def get_file_from_substring(filt, path, return_msg='error', exclude=None):
             else:
                 return None
             
-def split_bids_components(fname):
+def split_bids_components(fname, entities=False, add_elements=None):
 
     comp_list = fname.split('_')
     comps = {}
+
+    ids = ['sub', 'ses', 'task', 'acq', 'rec', 'run',
+           'space', 'hemi', 'model', 'stage', 'desc', 'vox']
     
-    ids = ['sub', 'ses', 'task', 'acq', 'rec', 'run', 'space', 'hemi', 'model', 'stage', 'desc', 'vox']
+    if add_elements is not None:
+        if isinstance(add_elements, str):
+            add_elements = [add_elements]
+        ids += add_elements
+
+    full_entities = [
+        "subject",
+        "session",
+        "task",
+        "reconstruction",
+        "acquisition",
+        "run"
+    ]
     for el in comp_list:
         for i in ids:
             if i in el:
@@ -856,13 +871,21 @@ def split_bids_components(fname):
                         ex = -1
 
                     comp = comp.split(".")[ex]
-                
-                if i == "run":
-                    comp = int(comp)
+
+                # if i == "run":
+                #     comp = int(comp)
 
                 comps[i] = comp
 
-    return comps
+    if len(comps) != 0:
+
+        if entities:
+            return comps, full_entities
+        else:
+            return comps
+    else:
+        raise ValueError(f"Could not find any element of {ids} in {fname}")
+    
 
 def generate_sanitized_metadata(ddict):
     import json
